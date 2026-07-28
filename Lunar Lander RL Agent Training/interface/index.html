@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PPO LunarLander — Mission Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #0a0d12;
+    --panel: #10151d;
+    --panel-border: #232b38;
+    --text: #e6ecf3;
+    --dim: #7c8798;
+    --go: #33ffb0;
+    --go-dim: #1a6b52;
+    --warn: #ffb627;
+    --crash: #ff5c5c;
+    --mono: 'IBM Plex Mono', monospace;
+    --disp: 'Space Grotesk', sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family:var(--disp); }
+  body{
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.25) 0, transparent 40%),
+      radial-gradient(1px 1px at 120px 80px, rgba(255,255,255,0.18) 0, transparent 40%),
+      radial-gradient(1.5px 1.5px at 220px 150px, rgba(255,255,255,0.2) 0, transparent 40%),
+      radial-gradient(1px 1px at 300px 40px, rgba(255,255,255,0.15) 0, transparent 40%),
+      radial-gradient(1px 1px at 400px 220px, rgba(255,255,255,0.2) 0, transparent 40%);
+    background-size: 500px 500px;
+    background-repeat: repeat;
+    min-height:100vh;
+    padding: 28px 32px 60px;
+  }
+
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    border-bottom:1px solid var(--panel-border); padding-bottom:18px; margin-bottom:24px;
+    flex-wrap:wrap; gap:16px;
+  }
+  .title-block .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:0.18em; color:var(--go);
+    text-transform:uppercase; margin-bottom:6px;
+  }
+  h1{ font-size:30px; margin:0; font-weight:700; letter-spacing:-0.01em; }
+  h1 span{ color:var(--dim); font-weight:500; }
+  .status-chip{
+    font-family:var(--mono); font-size:12px; letter-spacing:0.1em;
+    border:1px solid var(--go-dim); color:var(--go); padding:8px 14px;
+    border-radius:3px; display:flex; align-items:center; gap:8px; text-transform:uppercase;
+  }
+  .status-chip .dot{ width:7px; height:7px; border-radius:50%; background:var(--go); box-shadow:0 0 8px var(--go); animation:pulse 1.6s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  .grid{ display:grid; grid-template-columns: 2fr 1fr; gap:20px; }
+  @media (max-width: 900px){ .grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:6px;
+    padding:20px 22px;
+  }
+  .panel-label{
+    font-family:var(--mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--dim); margin-bottom:14px; display:flex; justify-content:space-between;
+  }
+
+  video{ width:100%; border-radius:4px; background:#000; display:block; border:1px solid var(--panel-border); }
+
+  .episode-tabs{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .ep-btn{
+    font-family:var(--mono); font-size:12px; background:transparent; color:var(--dim);
+    border:1px solid var(--panel-border); padding:8px 12px; border-radius:3px; cursor:pointer;
+    display:flex; align-items:center; gap:8px; transition: border-color .15s, color .15s;
+  }
+  .ep-btn:hover{ border-color:var(--go-dim); color:var(--text); }
+  .ep-btn.active{ border-color:var(--go); color:var(--go); background:rgba(51,255,176,0.06); }
+  .ep-btn .tag{ font-size:10px; padding:2px 6px; border-radius:2px; }
+  .ep-btn .tag.land{ background:rgba(51,255,176,0.15); color:var(--go); }
+  .ep-btn .tag.crash{ background:rgba(255,92,92,0.15); color:var(--crash); }
+
+  .readout{ font-family:var(--mono); font-size:13px; color:var(--dim); margin-top:12px; display:flex; justify-content:space-between; border-top:1px dashed var(--panel-border); padding-top:12px; }
+  .readout b{ color:var(--text); font-weight:600; }
+  .readout .val.land{ color:var(--go); }
+  .readout .val.crash{ color:var(--crash); }
+
+  .stat-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  .stat{ border:1px solid var(--panel-border); border-radius:4px; padding:14px; background:#0d1219; }
+  .stat .num{ font-family:var(--mono); font-size:26px; font-weight:600; color:var(--go); }
+  .stat .num.warn{ color:var(--warn); }
+  .stat .lbl{ font-family:var(--mono); font-size:10.5px; letter-spacing:0.08em; color:var(--dim); text-transform:uppercase; margin-top:4px; }
+
+  .rating-bar{ margin-top:6px; }
+  .rating-track{ height:8px; background:#1a212c; border-radius:4px; overflow:hidden; position:relative; border:1px solid var(--panel-border); }
+  .rating-fill{ height:100%; background:linear-gradient(90deg,#ff5c5c,#ffb627,#33ffb0); }
+  .rating-labels{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:10px; color:var(--dim); margin-top:6px; }
+
+  .hparams{ font-family:var(--mono); font-size:12.5px; line-height:2; color:var(--dim); }
+  .hparams b{ color:var(--text); font-weight:500; }
+  .hparams .row{ display:flex; justify-content:space-between; border-bottom:1px dashed var(--panel-border); padding:4px 0; }
+
+  .chart-wrap img{ width:100%; border-radius:4px; border:1px solid var(--panel-border); }
+
+  .obs-table{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px; }
+  .obs-table td, .obs-table th{ padding:6px 8px; border-bottom:1px solid var(--panel-border); text-align:left; color:var(--dim); }
+  .obs-table th{ color:var(--text); font-weight:600; text-transform:uppercase; font-size:10.5px; letter-spacing:0.06em; }
+  .obs-table td:first-child{ color:var(--go); }
+
+  footer{ margin-top:28px; text-align:center; font-family:var(--mono); font-size:11px; color:var(--dim); letter-spacing:0.05em; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-block">
+    <div class="eyebrow">// Autonomous Descent Program</div>
+    <h1>LunarLander <span>PPO Mission Console</span></h1>
+  </div>
+  <div class="status-chip"><span class="dot"></span> Agent trained · 200,000 steps</div>
+</header>
+
+<div class="grid">
+
+  <!-- LEFT: video + evaluation -->
+  <div>
+    <div class="panel">
+      <div class="panel-label"><span>Descent Playback</span><span id="epTimeLabel">EP-01</span></div>
+      <video id="lander-video" controls autoplay muted loop>
+        <source src="assets/lander-episode-0.mp4" type="video/mp4">
+      </video>
+      <div class="episode-tabs">
+        <button class="ep-btn active" data-src="assets/lander-episode-0.mp4" data-reward="176.10" data-result="land">
+          Episode 1 <span class="tag land">+176.1</span>
+        </button>
+        <button class="ep-btn" data-src="assets/lander-episode-1.mp4" data-reward="-105.55" data-result="crash">
+          Episode 2 <span class="tag crash">-105.6</span>
+        </button>
+        <button class="ep-btn" data-src="assets/lander-episode-2.mp4" data-reward="193.59" data-result="land">
+          Episode 3 <span class="tag land">+193.6</span>
+        </button>
+      </div>
+      <div class="readout">
+        <span>Outcome: <b id="outcomeText">Successful touchdown</b></span>
+        <span>Reward: <b class="val land" id="rewardText">+176.10</b></span>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:20px;">
+      <div class="panel-label"><span>Training Curve</span><span>logs/monitor.csv</span></div>
+      <div class="chart-wrap"><img src="assets/training_curve.png" alt="PPO training reward curve"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: telemetry -->
+  <div>
+    <div class="panel">
+      <div class="panel-label"><span>Evaluation — 20 Episodes</span></div>
+      <div class="stat-row">
+        <div class="stat"><div class="num">111.8</div><div class="lbl">Mean Reward</div></div>
+        <div class="stat"><div class="num warn">±107.9</div><div class="lbl">Std Deviation</div></div>
+      </div>
+      <div class="rating-bar">
+        <div class="rating-track"><div class="rating-fill" style="width:73%"></div></div>
+        <div class="rating-labels"><span>Poor</span><span>Moderate</span><span>Good ●</span><span>Excellent</span></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:20px;">
+      <div class="panel-label"><span>PPO Hyperparameters</span></div>
+      <div class="hparams">
+        <div class="row"><span>Policy</span><b>MlpPolicy</b></div>
+        <div class="row"><span>Learning rate</span><b>3e-4</b></div>
+        <div class="row"><span>Gamma</span><b>0.99</b></div>
+        <div class="row"><span>Batch size</span><b>64</b></div>
+        <div class="row"><span>n_steps</span><b>2048</b></div>
+        <div class="row"><span>n_epochs</span><b>10</b></div>
+        <div class="row"><span>clip_range</span><b>0.2</b></div>
+        <div class="row"><span>Total timesteps</span><b>200,000</b></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:20px;">
+      <div class="panel-label"><span>Observation Vector</span></div>
+      <table class="obs-table">
+        <tr><th>#</th><th>Variable</th><th>Description</th></tr>
+        <tr><td>0</td><td>x</td><td>Horizontal position</td></tr>
+        <tr><td>1</td><td>y</td><td>Vertical position</td></tr>
+        <tr><td>2</td><td>vx</td><td>Horizontal velocity</td></tr>
+        <tr><td>3</td><td>vy</td><td>Vertical velocity</td></tr>
+        <tr><td>4</td><td>angle</td><td>Rocket tilt</td></tr>
+        <tr><td>5</td><td>ang. vel.</td><td>Rotation speed</td></tr>
+        <tr><td>6</td><td>left leg</td><td>Ground contact</td></tr>
+        <tr><td>7</td><td>right leg</td><td>Ground contact</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>PPO · Stable-Baselines3 · Gymnasium LunarLander-v3 — generated from a real training run in this project</footer>
+
+<script>
+  const video = document.getElementById('lander-video');
+  const buttons = document.querySelectorAll('.ep-btn');
+  const outcomeText = document.getElementById('outcomeText');
+  const rewardText = document.getElementById('rewardText');
+  const epTimeLabel = document.getElementById('epTimeLabel');
+
+  buttons.forEach((btn, i) => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      video.querySelector('source').src = btn.dataset.src;
+      video.load();
+      video.play();
+      const reward = parseFloat(btn.dataset.reward);
+      const isLand = btn.dataset.result === 'land';
+      rewardText.textContent = (reward >= 0 ? '+' : '') + reward.toFixed(2);
+      rewardText.className = 'val ' + (isLand ? 'land' : 'crash');
+      outcomeText.textContent = isLand ? 'Successful touchdown' : 'Hard impact / crash';
+      epTimeLabel.textContent = 'EP-0' + (i + 1);
+    });
+  });
+</script>
+
+</body>
+</html>
