@@ -1,0 +1,3 @@
+Episodes: 20
+Mean reward: 500.00
+Std reward: 0.00
